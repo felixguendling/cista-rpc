@@ -2,10 +2,6 @@
   url=git@github.com:felixguendling/cista.git
   branch=master
   commit=6eb61f8be7586e7ea2ae22d3e346eb26e1ef0986
-[ctx]
-  url=git@github.com:motis-project/ctx.git
-  branch=master
-  commit=30b05eca8745173e4a7e4f40695f119a8484a708
 [doctest]
   url=git@github.com:motis-project/doctest.git
   branch=master

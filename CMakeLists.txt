@@ -21,7 +21,7 @@ endif ()
 # cprc Library
 ################################
 add_library(crpc INTERFACE)
-target_link_libraries(crpc INTERFACE cista ctx ws-client web-server)
+target_link_libraries(crpc INTERFACE cista ws-client web-server)
 target_include_directories(crpc INTERFACE include)
 target_compile_features(crpc INTERFACE cxx_std_17)
 

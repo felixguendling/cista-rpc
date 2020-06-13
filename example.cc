@@ -41,22 +41,19 @@ int main(int argc, char** argv) {
     ws.listen();
     ios.run();
   } else {
-    ctx::scheduler sched;
+    boost::asio::io_service ios;
     auto c =
-        crpc::client<crpc::ws_transport, interface>{sched, "localhost", "8080"};
+        crpc::client<crpc::ws_transport, interface>{ios, "localhost", "8080"};
     c.run([&]() {
-      sched.enqueue_io(
-          [&]() {
-            std::cout << "1+2=" << c.call(&interface::add_, 1, 2).val()
-                      << std::endl;
-            c.call(&interface::hello_world_);
-            c.call(&interface::inc_count_, 5);
-            std::cout << "5==" << c.call(&interface::get_count_).val()
-                      << std::endl;
-            c.ws_->stop();
-          },
-          ctx::op_id{}, ctx::dummy_data{});
+      c.call(
+          &interface::add_, [](int sum) { std::cout << "1+2=" << sum << "\n"; },
+          1, 2);
+      c.call(&interface::hello_world_, []() { std::cout << "hello server\n"; });
+      c.call(
+          &interface::inc_count_, []() { std::cout << "added 5\n"; }, 5);
+      c.call(&interface::get_count_,
+             [](int i) { std::cout << "count = " << i << "\n"; });
     });
-    sched.run(1);
+    ios.run();
   }
 }

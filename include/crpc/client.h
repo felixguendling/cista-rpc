@@ -3,8 +3,7 @@
 #include "cista/reflection/member_index.h"
 #include "cista/serialization.h"
 
-#include "ctx/future.h"
-
+#include "crpc/cb_t.h"
 #include "crpc/fn.h"
 
 namespace crpc {
@@ -15,22 +14,23 @@ struct client : public Transport {
   client(Args&&... args)  // NOLINT
       : Transport{std::forward<Args>(args)...} {}
 
-  template <typename ReturnType, typename... Args>
-  auto call(fn<ReturnType, Args...> Interface::*const member_ptr,
+  template <typename ReturnType, typename Fn, typename... Args>
+  void call(fn<ReturnType, Args...> Interface::*const member_ptr, Fn&& cb,
             Args&&... args) {
-    ctx::future_ptr<std::vector<unsigned char>> response;
+    auto send_cb = [acb = std::forward<Fn>(cb)](
+                       std::vector<unsigned char> const& response) {
+      if constexpr (std::is_same_v<ReturnType, void>) {
+        acb();
+      } else {
+        acb(*cista::deserialize<ReturnType>(response));
+      }
+    };
     if constexpr (sizeof...(Args) == 0U) {
-      response = Transport::send(cista::member_index(member_ptr), {});
+      Transport::send(cista::member_index(member_ptr), {}, std::move(send_cb));
     } else {
       auto const params = cista::tuple{std::forward<Args>(args)...};
-      response = Transport::send(cista::member_index(member_ptr),
-                                 cista::serialize(params));
-    }
-    if constexpr (!std::is_same_v<
-                      ReturnType,
-                      void>) {  // NOLINT(bugprone-suspicious-semicolon)
-      return response->resolve(
-          [](auto&& data) { return *cista::deserialize<ReturnType>(data); });
+      Transport::send(cista::member_index(member_ptr), cista::serialize(params),
+                      std::move(send_cb));
     }
   }
 };
