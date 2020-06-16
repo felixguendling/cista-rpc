@@ -1,4 +1,5 @@
 #include <iostream>
+#include <queue>
 #include <sstream>
 #include <string_view>
 
@@ -10,14 +11,21 @@
 #include "crpc/ws_server.h"
 #include "crpc/ws_transport.h"
 
+namespace data = cista::offset;
+
+struct asset {
+  uint32_t id_;
+  data::string name_;
+};
+
 struct interface {
   crpc::fn<int, int, int> add_;
   crpc::fn<void> hello_world_;
   crpc::fn<void, int> inc_count_;
   crpc::fn<int> get_count_;
+  crpc::fn<data::hash_map<uint32_t, asset>, data::vector<data::string>>
+      get_assets_;
 };
-
-void server() {}
 
 int main(int argc, char** argv) {
   if (argc != 2) {
@@ -35,6 +43,19 @@ int main(int argc, char** argv) {
     s.reg(&interface::hello_world_, [&]() { out << "hello world"; });
     s.reg(&interface::inc_count_, [&](int i) { return count += i; });
     s.reg(&interface::get_count_, [&]() { return count; });
+    s.reg(&interface::get_assets_,
+          [&,
+           store =
+               data::hash_map<data::string, asset>{
+                   {"hello", asset{0, "hello"}}, {"world", asset{1, "world"}}}](
+              data::vector<data::string> const& assets) {
+            data::hash_map<uint32_t, asset> response;
+            for (auto const& a : assets) {
+              auto const& s = store.at(a);
+              response.emplace(s.id_, s);
+            }
+            return response;
+          });
 
     boost::asio::io_service ios;
     auto ws = crpc::ws_server{ios, "0.0.0.0", "8080", s};
@@ -53,6 +74,15 @@ int main(int argc, char** argv) {
           &interface::inc_count_, []() { std::cout << "added 5\n"; }, 5);
       c.call(&interface::get_count_,
              [](int i) { std::cout << "count = " << i << "\n"; });
+      c.call(
+          &interface::get_assets_,
+          [&](data::hash_map<uint32_t, asset> const& assets) {
+            for (auto const& [id, a] : assets) {
+              std::cout << id << ": " << a.name_ << "\n";
+            }
+          },
+          data::vector<data::string>{
+              {data::string{"hello"}, data::string{"world"}}});
     });
     ios.run();
   }
